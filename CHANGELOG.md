@@ -1,5 +1,11 @@
 # Changelog
 
+## [Unreleased]
+
+### Fixed
+
+- **A pull can no longer truncate a live session log that grew during the pull window.** The pull checkpoints the live store into the mirror, merges the remote, then restores the merged mirror back into the live store. A host append landing between the checkpoint and the restore made the restore overwrite the live log with the older checkpoint bytes, removing whole append frames (observed 2026-11-14 on DSH 0.2.2-rc.3: a session lost seq 380–381 and the host reader permanently refused the log). `restoreSessionRoot` now re-compares each existing session log (`session.v<N>.jsonl[.zstd]`) against the exact bytes it would write, immediately before writing: a live log that extends the mirror bytes, or diverges from them, is left untouched and counted (`liveAheadSkipped` / `divergedSkipped`), and the pull surfaces a warning; only a strictly ahead mirror still fast-forwards a cold log, and absent targets restore as before. The next push mirrors the live tail, so the skip is self-healing. Non-log files keep their previous restore behavior. Residual: the millisecond window between the guard's read and the write remains — closing it fully needs host-side coordination, which the zero-DSH-dependency lib cannot do. Regression tests cover the mirror-level guard and the full engine pull with the append injected into the checkpoint→restore window.
+
 ## [0.3.1] - 2026-11-14
 
 ### Fixed
